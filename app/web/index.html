@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Taskboard</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/tasks.js" defer></script>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Taskboard</h1>
+      <p id="summary" aria-live="polite"></p>
+    </header>
+    <section aria-label="Tasks">
+      <form>
+        <label for="title">New task</label>
+        <div class="entry">
+          <input id="title" name="title" maxlength="120" required placeholder="What needs doing?">
+          <button type="submit">Add task</button>
+        </div>
+      </form>
+      <p id="status" role="status">Loading tasks…</p>
+      <button id="retry" type="button" hidden>Retry</button>
+      <ul aria-label="Task list"></ul>
+    </section>
+  </main>
+</body>
+</html>
