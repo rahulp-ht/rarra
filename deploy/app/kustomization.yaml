@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: taskboard
+resources:
+  - postgres.yaml
+  - api.yaml
+  - web.yaml
+configMapGenerator:
+  - name: postgres-init
+    files:
+      - 01-tasks.sql
+images:
+  - name: taskboard-api
+    newTag: v1
+  - name: taskboard-web
+    newTag: v1
