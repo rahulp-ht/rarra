@@ -2,7 +2,7 @@
 
 Taskboard is a single-user task tracker. The browser can add, edit, search, filter, complete, reopen, and delete tasks. Nginx serves the frontend and proxies API requests to Flask. The API persists tasks in PostgreSQL.
 
-Argo CD reconciles the application and monitoring manifests from Git. Prometheus scrapes the API, Alloy sends taskboard pod logs to Loki, and Grafana provisions both data sources and a dashboard. The services are exposed locally through port-forwarding.
+Argo CD reconciles the application and monitoring manifests from Git. Prometheus scrapes the API and kubelet resource metrics, Alloy sends taskboard pod logs to Loki, and Grafana provisions both data sources and a dashboard. The services are exposed locally through port-forwarding.
 
 | Directory | Contents |
 | --- | --- |
@@ -92,6 +92,12 @@ The commands in the table are an alternative if you want to forward one service 
 - **Argo CD.** Sign in as `admin`. The initial password is in the `argocd-initial-admin-secret`: `kubectl --context=lab -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`. The local HTTPS endpoint uses a self-signed certificate.
 - **Prometheus.** Confirm the `taskboard-api` target is up. Generate several task actions and allow at least two 15-second scrapes for rate queries.
 - **Grafana.** Sign in as `admin` with the password you set. Open the **Taskboard** dashboard to see API and database health, task totals and actions, web traffic, API latency, database timing and errors, and pod logs.
+
+## Check pod CPU and memory
+
+The **Taskboard** dashboard includes **Pod CPU usage** and **Pod memory working set**. The panels show individual pods in the `taskboard` namespace, including the frontend, API, and PostgreSQL. CPU is measured in millicores, where 1000 mCPU is one core. Memory is the working set reported by kubelet.
+
+After the monitoring Application syncs, open Prometheus at http://localhost:4083/targets and check that `kubelet-resource` is **UP**. Allow several 15-second scrapes for the CPU rate. The metrics come from kubelet’s HTTPS resource endpoint. The lab accepts Minikube’s self-signed kubelet certificate and authenticates with a dedicated service account.
 
 ## Follow a request in Grafana
 

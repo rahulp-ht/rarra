@@ -1,4 +1,35 @@
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: taskboard-prometheus-kubelet
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [list, watch]
+  - apiGroups: [""]
+    resources: [nodes/metrics]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: taskboard-prometheus-kubelet
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: monitoring
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: taskboard-prometheus-kubelet
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: prometheus
@@ -38,7 +69,7 @@ spec:
       labels:
         app: prometheus
     spec:
-      automountServiceAccountToken: false
+      serviceAccountName: prometheus
       initContainers:
         - name: set-data-owner
           image: busybox:1.37

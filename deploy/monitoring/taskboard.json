@@ -300,6 +300,66 @@
       ]
     },
     {
+      "id": 13,
+      "title": "Pod CPU usage",
+      "description": "Average CPU usage in millicores. 1000 mCPU equals one CPU core.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "suffix:mCPU",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1000 * sum by (pod) (rate(pod_cpu_usage_seconds_total{job=\"kubelet-resource\",namespace=\"taskboard\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Pod memory working set",
+      "description": "Memory working set reported by the kubelet for each Taskboard pod.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "min": 0
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (pod) (pod_memory_working_set_bytes{job=\"kubelet-resource\",namespace=\"taskboard\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ]
+    },
+    {
       "id": 11,
       "title": "Task actions and database errors",
       "description": "",
@@ -312,7 +372,7 @@
         "h": 12,
         "w": 12,
         "x": 0,
-        "y": 28
+        "y": 36
       },
       "targets": [
         {
@@ -335,7 +395,7 @@
         "h": 12,
         "w": 12,
         "x": 12,
-        "y": 28
+        "y": 36
       },
       "targets": [
         {
