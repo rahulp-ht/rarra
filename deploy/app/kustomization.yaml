@@ -13,4 +13,4 @@ images:
   - name: taskboard-api
     newTag: v2
   - name: taskboard-web
-    newTag: v2
+    newTag: v3

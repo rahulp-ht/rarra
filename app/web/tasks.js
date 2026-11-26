@@ -1,11 +1,12 @@
 const form = document.querySelector("#create-task");
 const title = document.querySelector("#title");
 const add = form.querySelector("button");
-const list = document.querySelector("ul");
-const status = document.querySelector("#status");
+const list = document.querySelector("#tasks");
+const feedback = document.querySelector("#status");
 const empty = document.querySelector("#empty");
 const refresh = document.querySelector("#refresh");
-const filter = document.querySelector("#filter");
+const filters = [...document.querySelectorAll("[data-filter]")];
+const clearFilters = document.querySelector("#clear-filters");
 const search = document.querySelector("#search");
 const dialog = document.querySelector("#task-dialog");
 const editField = document.querySelector("#edit-field");
@@ -18,17 +19,20 @@ let tasks = [];
 let loaded = false;
 let busy = false;
 let selection;
+let activeFilter = "all";
 
 async function api(path = "", method = "GET", body) {
   let response;
   try {
     response = await fetch("/api/tasks" + path, {
       method,
+      signal: AbortSignal.timeout(17000),
       headers: body ? { "Content-Type": "application/json" } : {},
       body: body ? JSON.stringify(body) : undefined,
     });
-  } catch {
-    throw new Error("Could not reach the task service.");
+  } catch (error) {
+    if (error.name === "TimeoutError") throw new Error("The task service timed out. Refresh before retrying.");
+    throw new Error("Could not reach the task service. Try refreshing.");
   }
   if (!response.ok) {
     const details = await response.json().catch(() => ({}));
@@ -36,7 +40,10 @@ async function api(path = "", method = "GET", body) {
     const message = details.error || `Task service returned HTTP ${response.status}.`;
     throw new Error(requestId ? `${message} Request ID: ${requestId}` : message);
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  return response.json().catch(() => {
+    throw new Error("The task service returned an unreadable response. Try refreshing.");
+  });
 }
 
 function setBusy(value) {
@@ -58,17 +65,21 @@ function render() {
   document.querySelector("#progress").value = percent;
   const query = search.value.trim().toLowerCase();
   const visible = tasks.filter(task =>
-    (filter.value === "all" || task.done === (filter.value === "completed")) &&
+    (activeFilter === "all" || task.done === (activeFilter === "completed")) &&
     task.title.toLowerCase().includes(query)
   );
   empty.hidden = !loaded || visible.length > 0;
-  empty.textContent = tasks.length ? "No tasks match your filters." : "No tasks yet.";
+  document.querySelector("#empty-title").textContent = tasks.length ? "No matching tasks" : "No tasks yet";
+  document.querySelector("#empty-detail").textContent = tasks.length
+    ? "Try another search or clear the filters."
+    : "Add your first task using the field above.";
+  clearFilters.hidden = !tasks.length;
   list.replaceChildren(...visible.map(taskRow));
 }
 
 function restoreFocus(id, action) {
   const control = list.querySelector(`li[data-id="${id}"] [data-action="${action}"]`);
-  (control || filter).focus();
+  (control || filters.find(button => button.dataset.filter === activeFilter)).focus();
 }
 
 function taskRow(task) {
@@ -92,7 +103,7 @@ function taskRow(task) {
       tasks = tasks.map(item => item.id === task.id ? updated : item);
       render();
       restoreFocus(task.id, "toggle");
-      status.textContent = updated.done ? "Task completed." : "Task reopened.";
+      feedback.textContent = updated.done ? "Task completed." : "Task reopened.";
     } else {
       check.checked = task.done;
     }
@@ -101,7 +112,7 @@ function taskRow(task) {
   for (const action of ["Edit", "Delete"]) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "secondary";
+    button.className = "button secondary task-action";
     button.dataset.action = action;
     button.textContent = action;
     button.setAttribute("aria-label", `${action} ${task.title}`);
@@ -113,14 +124,16 @@ function taskRow(task) {
   return row;
 }
 
-async function changeTask(operation, feedback = status) {
+async function changeTask(operation, message = feedback) {
   if (busy) return undefined;
-  feedback.textContent = "";
+  message.textContent = "";
+  message.classList.remove("error");
   setBusy(true);
   try {
     return await operation();
   } catch (error) {
-    feedback.textContent = error.message;
+    message.textContent = error.message;
+    message.classList.add("error");
     return undefined;
   } finally {
     setBusy(false);
@@ -130,14 +143,14 @@ async function changeTask(operation, feedback = status) {
 async function load() {
   if (busy) return;
   const pending = changeTask(() => api());
-  status.textContent = "Loading tasks…";
+  feedback.textContent = "Loading tasks…";
   const result = await pending;
   if (result) {
     tasks = result;
     loaded = true;
     add.disabled = false;
     render();
-    status.textContent = "Tasks up to date.";
+    feedback.textContent = "Tasks up to date.";
   }
 }
 
@@ -151,6 +164,7 @@ function openDialog(task, action) {
   deleteText.hidden = editing;
   deleteText.textContent = editing ? "" : task.title;
   confirmAction.textContent = editing ? "Save changes" : "Delete task";
+  confirmAction.classList.toggle("danger", !editing);
   dialogStatus.textContent = "";
   dialog.showModal();
   (editing ? editTitle : cancel).focus();
@@ -172,7 +186,8 @@ document.querySelector("#task-action").addEventListener("submit", async event =>
   dialog.close();
   render();
   restoreFocus(task.id, action);
-  status.textContent = action === "Edit" ? "Task updated." : "Task deleted.";
+  feedback.classList.remove("error");
+  feedback.textContent = action === "Edit" ? "Task updated." : "Task deleted.";
 });
 
 cancel.addEventListener("click", () => dialog.close());
@@ -182,18 +197,33 @@ dialog.addEventListener("cancel", event => {
 
 form.addEventListener("submit", async event => {
   event.preventDefault();
+  if (!loaded) return;
   const task = await changeTask(() => api("", "POST", { title: title.value.trim() }));
   if (!task) return;
   tasks.unshift(task);
   form.reset();
-  filter.value = "all";
   search.value = "";
-  render();
+  setFilter("all");
   title.focus();
-  status.textContent = "Task added.";
+  feedback.textContent = "Task added.";
 });
 
 refresh.addEventListener("click", load);
-filter.addEventListener("change", render);
+function setFilter(value) {
+  activeFilter = value;
+  for (const button of filters) {
+    button.setAttribute("aria-pressed", String(button.dataset.filter === value));
+  }
+  render();
+}
+
+for (const button of filters) {
+  button.addEventListener("click", () => setFilter(button.dataset.filter));
+}
+clearFilters.addEventListener("click", () => {
+  search.value = "";
+  setFilter("all");
+  search.focus();
+});
 search.addEventListener("input", render);
 load();
