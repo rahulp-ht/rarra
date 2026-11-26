@@ -11,6 +11,6 @@ configMapGenerator:
       - 01-tasks.sql
 images:
   - name: taskboard-api
-    newTag: v1
+    newTag: v2
   - name: taskboard-web
-    newTag: v1
+    newTag: v2
