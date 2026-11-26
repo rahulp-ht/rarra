@@ -1,93 +1,199 @@
-const form = document.querySelector("form");
+const form = document.querySelector("#create-task");
 const title = document.querySelector("#title");
+const add = form.querySelector("button");
 const list = document.querySelector("ul");
 const status = document.querySelector("#status");
-const summary = document.querySelector("#summary");
-const retry = document.querySelector("#retry");
-const add = form.querySelector("button");
+const empty = document.querySelector("#empty");
+const refresh = document.querySelector("#refresh");
+const filter = document.querySelector("#filter");
+const search = document.querySelector("#search");
+const dialog = document.querySelector("#task-dialog");
+const editField = document.querySelector("#edit-field");
+const editTitle = document.querySelector("#edit-title");
+const deleteText = document.querySelector("#delete-text");
+const dialogStatus = document.querySelector("#dialog-status");
+const confirmAction = document.querySelector("#confirm");
+const cancel = document.querySelector("#cancel");
 let tasks = [];
+let loaded = false;
+let busy = false;
+let selection;
 
 async function api(path = "", method = "GET", body) {
-  const response = await fetch("/api/tasks" + path, {
-    method,
-    headers: body ? { "Content-Type": "application/json" } : {},
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch("/api/tasks" + path, {
+      method,
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch {
+    throw new Error("Could not reach the task service.");
+  }
   if (!response.ok) {
     const details = await response.json().catch(() => ({}));
-    throw new Error(details.error || "Could not reach the task service.");
+    const requestId = response.headers.get("X-Request-ID");
+    const message = details.error || `Task service returned HTTP ${response.status}.`;
+    throw new Error(requestId ? `${message} Request ID: ${requestId}` : message);
   }
   return response.status === 204 ? null : response.json();
 }
 
+function setBusy(value) {
+  busy = value;
+  add.disabled = value || !loaded;
+  refresh.disabled = value;
+  confirmAction.disabled = value;
+  cancel.disabled = value;
+  editTitle.disabled = value;
+  list.querySelectorAll("button, input").forEach(control => { control.disabled = value; });
+}
+
 function render() {
-  const complete = tasks.filter(task => task.done).length;
-  summary.textContent = tasks.length ? `${complete} of ${tasks.length} completed` : "";
-  status.textContent = tasks.length ? "" : "No tasks yet.";
-  list.replaceChildren(...tasks.map(task => {
-    const row = document.createElement("li");
-    const label = document.createElement("label");
-    const check = document.createElement("input");
-    const name = document.createElement("span");
-    const remove = document.createElement("button");
-    check.type = "checkbox";
-    check.checked = task.done;
-    name.textContent = task.title;
-    remove.type = "button";
-    remove.textContent = "Delete";
-    remove.setAttribute("aria-label", `Delete ${task.title}`);
-    async function change(method, body) {
-      check.disabled = remove.disabled = true;
-      try {
-        const updated = await api(`/${task.id}`, method, body);
-        tasks = updated
-          ? tasks.map(item => item.id === task.id ? updated : item)
-          : tasks.filter(item => item.id !== task.id);
-        render();
-      } catch (error) {
-        check.checked = task.done;
-        status.textContent = error.message;
-      } finally {
-        check.disabled = remove.disabled = false;
-      }
+  const completed = tasks.filter(task => task.done).length;
+  const percent = tasks.length ? Math.round(100 * completed / tasks.length) : 0;
+  document.querySelector("#open-count").textContent = loaded ? tasks.length - completed : "—";
+  document.querySelector("#done-count").textContent = loaded ? completed : "—";
+  document.querySelector("#percent").textContent = loaded ? `${percent}%` : "—";
+  document.querySelector("#progress").value = percent;
+  const query = search.value.trim().toLowerCase();
+  const visible = tasks.filter(task =>
+    (filter.value === "all" || task.done === (filter.value === "completed")) &&
+    task.title.toLowerCase().includes(query)
+  );
+  empty.hidden = !loaded || visible.length > 0;
+  empty.textContent = tasks.length ? "No tasks match your filters." : "No tasks yet.";
+  list.replaceChildren(...visible.map(taskRow));
+}
+
+function restoreFocus(id, action) {
+  const control = list.querySelector(`li[data-id="${id}"] [data-action="${action}"]`);
+  (control || filter).focus();
+}
+
+function taskRow(task) {
+  const row = document.createElement("li");
+  row.dataset.id = task.id;
+  const label = document.createElement("label");
+  const check = document.createElement("input");
+  const name = document.createElement("span");
+  const actions = document.createElement("div");
+  actions.className = "actions";
+  check.type = "checkbox";
+  check.dataset.action = "toggle";
+  check.checked = task.done;
+  check.disabled = busy;
+  name.textContent = task.title;
+  label.append(check, name);
+
+  check.addEventListener("change", async () => {
+    const updated = await changeTask(() => api(`/${task.id}`, "PATCH", { done: check.checked }));
+    if (updated) {
+      tasks = tasks.map(item => item.id === task.id ? updated : item);
+      render();
+      restoreFocus(task.id, "toggle");
+      status.textContent = updated.done ? "Task completed." : "Task reopened.";
+    } else {
+      check.checked = task.done;
     }
-    check.addEventListener("change", () => change("PATCH", { done: check.checked }));
-    remove.addEventListener("click", () => change("DELETE"));
-    label.append(check, name);
-    row.append(label, remove);
-    return row;
-  }));
+  });
+
+  for (const action of ["Edit", "Delete"]) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary";
+    button.dataset.action = action;
+    button.textContent = action;
+    button.setAttribute("aria-label", `${action} ${task.title}`);
+    button.disabled = busy;
+    button.addEventListener("click", () => openDialog(task, action));
+    actions.append(button);
+  }
+  row.append(label, actions);
+  return row;
+}
+
+async function changeTask(operation, feedback = status) {
+  if (busy) return undefined;
+  feedback.textContent = "";
+  setBusy(true);
+  try {
+    return await operation();
+  } catch (error) {
+    feedback.textContent = error.message;
+    return undefined;
+  } finally {
+    setBusy(false);
+  }
 }
 
 async function load() {
-  add.disabled = retry.disabled = true;
-  try {
-    tasks = await api();
-    retry.hidden = true;
-    render();
+  if (busy) return;
+  const pending = changeTask(() => api());
+  status.textContent = "Loading tasks…";
+  const result = await pending;
+  if (result) {
+    tasks = result;
+    loaded = true;
     add.disabled = false;
-  } catch (error) {
-    status.textContent = error.message;
-    retry.hidden = false;
-  } finally {
-    retry.disabled = false;
+    render();
+    status.textContent = "Tasks up to date.";
   }
 }
 
+function openDialog(task, action) {
+  selection = { task, action };
+  const editing = action === "Edit";
+  document.querySelector("#dialog-title").textContent = editing ? "Edit task" : "Delete task?";
+  editField.hidden = !editing;
+  editTitle.required = editing;
+  editTitle.value = editing ? task.title : "";
+  deleteText.hidden = editing;
+  deleteText.textContent = editing ? "" : task.title;
+  confirmAction.textContent = editing ? "Save changes" : "Delete task";
+  dialogStatus.textContent = "";
+  dialog.showModal();
+  (editing ? editTitle : cancel).focus();
+}
+
+document.querySelector("#task-action").addEventListener("submit", async event => {
+  event.preventDefault();
+  const { task, action } = selection;
+  const updated = await changeTask(
+    () => action === "Edit"
+      ? api(`/${task.id}`, "PATCH", { title: editTitle.value.trim() })
+      : api(`/${task.id}`, "DELETE"),
+    dialogStatus,
+  );
+  if (updated === undefined) return;
+  tasks = updated
+    ? tasks.map(item => item.id === task.id ? updated : item)
+    : tasks.filter(item => item.id !== task.id);
+  dialog.close();
+  render();
+  restoreFocus(task.id, action);
+  status.textContent = action === "Edit" ? "Task updated." : "Task deleted.";
+});
+
+cancel.addEventListener("click", () => dialog.close());
+dialog.addEventListener("cancel", event => {
+  if (busy) event.preventDefault();
+});
+
 form.addEventListener("submit", async event => {
   event.preventDefault();
-  add.disabled = true;
-  try {
-    const task = await api("", "POST", { title: title.value.trim() });
-    tasks.unshift(task);
-    form.reset();
-    render();
-    title.focus();
-  } catch (error) {
-    status.textContent = error.message;
-  } finally {
-    add.disabled = false;
-  }
+  const task = await changeTask(() => api("", "POST", { title: title.value.trim() }));
+  if (!task) return;
+  tasks.unshift(task);
+  form.reset();
+  filter.value = "all";
+  search.value = "";
+  render();
+  title.focus();
+  status.textContent = "Task added.";
 });
-retry.addEventListener("click", load);
+
+refresh.addEventListener("click", load);
+filter.addEventListener("change", render);
+search.addEventListener("input", render);
 load();

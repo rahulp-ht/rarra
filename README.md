@@ -1,6 +1,6 @@
 # Taskboard DevOps lab
 
-Taskboard is a single-user task tracker. The browser can add, list, complete, reopen, and delete tasks. Nginx serves the frontend and proxies API requests to Flask. The API persists tasks in PostgreSQL.
+Taskboard is a single-user task tracker. The browser can add, edit, search, filter, complete, reopen, and delete tasks. Nginx serves the frontend and proxies API requests to Flask. The API persists tasks in PostgreSQL.
 
 Argo CD reconciles the application and monitoring manifests from Git. Prometheus scrapes the API, Alloy sends taskboard pod logs to Loki, and Grafana provisions both data sources and a dashboard. The services are exposed locally through port-forwarding.
 
@@ -24,8 +24,8 @@ From the repository root:
 
 ```bash
 minikube start -p lab --driver=docker --cpus=4 --memory=8192 --kubernetes-version=v1.34.0
-minikube -p lab image build -t taskboard-api:v1 ./app/api
-minikube -p lab image build -t taskboard-web:v1 ./app/web
+minikube -p lab image build -t taskboard-api:v2 ./app/api
+minikube -p lab image build -t taskboard-web:v2 ./app/web
 ```
 
 The images are built directly into Minikube. Their tags match `deploy/app/kustomization.yaml`.
@@ -88,15 +88,37 @@ The commands in the table are an alternative if you want to forward one service 
 | Grafana | `kubectl --context=lab -n monitoring port-forward svc/grafana 4082:3000` | http://localhost:4082 |
 | Prometheus | `kubectl --context=lab -n monitoring port-forward svc/prometheus 4083:9090` | http://localhost:4083/targets |
 
-- **Taskboard.** Add a task, mark it complete, refresh to verify persistence, then reopen and delete it. `GET /api/tasks` returns the stored tasks as JSON.
+- **Taskboard.** Add a task, edit its title, mark it complete, and refresh to verify persistence. Use the status filter to find it, then reopen and delete it. `GET /api/tasks` returns the stored tasks as JSON.
 - **Argo CD.** Sign in as `admin`. The initial password is in the `argocd-initial-admin-secret`: `kubectl --context=lab -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d`. The local HTTPS endpoint uses a self-signed certificate.
 - **Prometheus.** Confirm the `taskboard-api` target is up. Generate several task actions and allow at least two 15-second scrapes for rate queries.
-- **Grafana.** Sign in as `admin` with the password you set. Open the **Taskboard** dashboard to see request rates, latency, and logs. In Explore, use the Loki query `{namespace="taskboard", container="api"}` to inspect API access logs.
+- **Grafana.** Sign in as `admin` with the password you set. Open the **Taskboard** dashboard to see API and database health, task totals and actions, web traffic, API latency, database timing and errors, and pod logs.
+
+## Follow a request in Grafana
+
+Create, rename, and complete a task, then open the **Taskboard** dashboard. Allow a few 15-second Prometheus scrapes for rate panels. Task actions count committed changes. PostgreSQL task totals reflect the latest successful inventory query. Search and filters run in the browser.
+
+In Grafana **Explore**, select **Loki** and run:
+
+```logql
+{namespace="taskboard", container="api"} | json | event="task_action"
+```
+
+Copy a `request_id` from an event, then search across the namespace to see its matching Nginx request and API response:
+
+```logql
+{namespace="taskboard"} | json | request_id="PASTE_REQUEST_ID"
+```
+
+The Nginx and API request logs omit task titles, request bodies, and query strings. The dashboard covers Taskboard traffic, application state, PostgreSQL operations as seen by the API, and logs in the Taskboard namespace.
+
+## Upgrade an existing lab
+
+Build both `v2` images in `lab` using the commands above before merging the changes into `main`. Argo CD then rolls out the app and provisioned dashboard. The existing PostgreSQL schema already supports title edits.
 
 ## Practice GitOps
 
-1. Change the frontend heading in `app/web/index.html` and build a new image with `minikube -p lab image build -t taskboard-web:v2 ./app/web`.
-2. Set the web image's `newTag` to `v2` in `deploy/app/kustomization.yaml`, then commit and push both changes. Watch Argo CD roll out the new image.
+1. Change the frontend heading in `app/web/index.html` and build a new image with `minikube -p lab image build -t taskboard-web:v3 ./app/web`.
+2. Set the web image's `newTag` to `v3` in `deploy/app/kustomization.yaml`, then commit and push both changes. Watch Argo CD roll out the new image.
 3. Practice self-healing by changing the web Deployment replica count directly in the cluster. Argo CD should restore the value from Git. Revert the image-tag commit to practice rolling back through Git.
 
 For API changes, follow the same build-and-tag workflow with `taskboard-api`. Keep the previous images in Minikube for rollbacks. PostgreSQL, Prometheus, Loki, and Grafana keep data on persistent volume claims. PostgreSQL runs `01-tasks.sql` on first initialization of an empty data directory. Apply future schema changes as migrations for existing databases.

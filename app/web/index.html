@@ -11,20 +11,60 @@
   <main>
     <header>
       <h1>Taskboard</h1>
-      <p id="summary" aria-live="polite"></p>
+      <button id="refresh" class="secondary" type="button">Refresh</button>
     </header>
-    <section aria-label="Tasks">
-      <form>
+
+    <section class="overview" aria-label="Task progress">
+      <div><span>Open</span><strong id="open-count">—</strong></div>
+      <div><span>Completed</span><strong id="done-count">—</strong></div>
+      <div class="progress">
+        <label for="progress">Completion <output id="percent">—</output></label>
+        <progress id="progress" max="100" value="0"></progress>
+      </div>
+    </section>
+
+    <section class="board" aria-label="Tasks">
+      <form id="create-task">
         <label for="title">New task</label>
         <div class="entry">
           <input id="title" name="title" maxlength="120" required placeholder="What needs doing?">
-          <button type="submit">Add task</button>
+          <button type="submit" disabled>Add task</button>
         </div>
       </form>
+      <div class="toolbar">
+        <div>
+          <label for="filter">Status</label>
+          <select id="filter">
+            <option value="all">All tasks</option>
+            <option value="open">Open</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="search">
+          <label for="search">Search</label>
+          <input type="search" id="search" placeholder="Find by title">
+        </div>
+      </div>
       <p id="status" role="status">Loading tasks…</p>
-      <button id="retry" type="button" hidden>Retry</button>
+      <p id="empty" hidden></p>
       <ul aria-label="Task list"></ul>
     </section>
   </main>
+
+  <dialog id="task-dialog" aria-labelledby="dialog-title">
+    <form id="task-action">
+      <h2 id="dialog-title"></h2>
+      <div id="edit-field">
+        <label for="edit-title">Task title</label>
+        <input id="edit-title" maxlength="120">
+      </div>
+      <p id="delete-text" hidden></p>
+      <p id="dialog-status" role="status"></p>
+      <div class="actions">
+        <button class="secondary" id="cancel" type="button">Cancel</button>
+        <button id="confirm" type="submit"></button>
+      </div>
+    </form>
+  </dialog>
 </body>
 </html>

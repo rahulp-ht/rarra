@@ -5,9 +5,8 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; border-top: 6px solid #334caa; }
-main { max-width: 46rem; margin: clamp(2rem, 10vh, 6rem) auto; padding: 0 1rem; }
+main { max-width: 52rem; margin: clamp(2rem, 10vh, 6rem) auto; padding: 0 1rem; }
 h1 { font-size: clamp(2.5rem, 9vw, 4.5rem); letter-spacing: -.06em; margin: 0; }
-header p { color: #435478; margin: .4rem 0 1.6rem; }
 section { background: white; border: 1px solid #d8e0ee; border-radius: 1rem; padding: clamp(1rem, 4vw, 2rem); }
 label { font-weight: 600; }
 .entry { display: flex; flex-wrap: wrap; gap: .6rem; margin-top: .5rem; }
@@ -20,6 +19,24 @@ li { display: flex; align-items: center; justify-content: space-between; gap: .7
 li label { display: flex; align-items: center; gap: .7rem; overflow-wrap: anywhere; }
 li input { flex: none; width: 1.15rem; height: 1.15rem; accent-color: #334caa; }
 li input:checked + span { text-decoration: line-through; color: #435478; }
-li button, #retry { background: #e6ecfa; color: #23397f; }
 #status:empty { display: none; }
 :focus-visible { outline: 3px solid #345ed9; outline-offset: 3px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.overview { display: flex; flex-wrap: wrap; gap: 1rem 2rem; margin-bottom: 1rem; background: #263975; color: white; }
+.overview strong { display: block; font-size: 1.75rem; }
+.overview span, .overview label { color: #eef2ff; }
+.progress { flex: 1 1 12rem; align-self: center; }
+.progress label { display: flex; justify-content: space-between; }
+progress { width: 100%; margin-top: .4rem; accent-color: #aac0ff; }
+.toolbar { display: flex; flex-wrap: wrap; gap: .75rem; margin-top: 1.25rem; }
+.toolbar > div { display: grid; gap: .35rem; }
+.search { flex: 1 1 12rem; }
+input[type=search], select, #edit-title { font: inherit; padding: .6rem; border: 1px solid #8291ac; border-radius: .5rem; min-width: 0; background: white; color: inherit; }
+.actions { display: flex; flex-wrap: wrap; gap: .45rem; }
+.secondary { background: #e6ecfa; color: #23397f; }
+dialog { width: min(28rem, calc(100% - 2rem)); border: 1px solid #8291ac; border-radius: 1rem; padding: 1.25rem; color: inherit; }
+dialog::backdrop { background: #17234499; }
+dialog h2 { margin-top: 0; }
+dialog .actions { justify-content: flex-end; }
+#edit-title { display: block; width: 100%; margin-top: .4rem; }
+#delete-text { overflow-wrap: anywhere; }
