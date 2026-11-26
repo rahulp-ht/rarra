@@ -3,52 +3,63 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#102a25">
   <title>Taskboard</title>
-  <link rel="stylesheet" href="/style.css">
-  <script src="/tasks.js" defer></script>
+  <link rel="stylesheet" href="/style.css?v=__STYLE_HASH__">
+  <script type="module" src="/tasks.js?v=__SCRIPT_HASH__"></script>
 </head>
 <body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <span class="brand"><span class="brand-mark" aria-hidden="true">✓</span> Taskboard</span>
+      <button id="refresh" class="button secondary refresh" type="button" disabled>Refresh tasks</button>
+    </div>
+  </div>
   <main>
-    <header>
-      <h1>Taskboard</h1>
-      <button id="refresh" class="secondary" type="button">Refresh</button>
+    <header class="page-heading">
+      <h1>My tasks</h1>
     </header>
 
-    <section class="overview" aria-label="Task progress">
-      <div><span>Open</span><strong id="open-count">—</strong></div>
-      <div><span>Completed</span><strong id="done-count">—</strong></div>
-      <div class="progress">
-        <label for="progress">Completion <output id="percent">—</output></label>
-        <progress id="progress" max="100" value="0"></progress>
-      </div>
-    </section>
+    <div class="workspace">
+      <section class="board" aria-labelledby="board-heading">
+        <h2 id="board-heading">Task list</h2>
+        <form id="create-task">
+          <label for="title">New task</label>
+          <div class="entry">
+            <input id="title" name="title" maxlength="120" required placeholder="What needs doing?">
+            <button class="button primary" type="submit" disabled><span aria-hidden="true">+</span> Add task</button>
+          </div>
+        </form>
 
-    <section class="board" aria-label="Tasks">
-      <form id="create-task">
-        <label for="title">New task</label>
-        <div class="entry">
-          <input id="title" name="title" maxlength="120" required placeholder="What needs doing?">
-          <button type="submit" disabled>Add task</button>
+        <div class="toolbar">
+          <div class="filters" role="group" aria-label="Filter tasks by status">
+            <button type="button" data-filter="all" aria-pressed="true">All</button>
+            <button type="button" data-filter="open" aria-pressed="false">Open</button>
+            <button type="button" data-filter="completed" aria-pressed="false">Completed</button>
+          </div>
+          <input type="search" id="search" aria-label="Search tasks" placeholder="Search tasks">
         </div>
-      </form>
-      <div class="toolbar">
-        <div>
-          <label for="filter">Status</label>
-          <select id="filter">
-            <option value="all">All tasks</option>
-            <option value="open">Open</option>
-            <option value="completed">Completed</option>
-          </select>
+
+        <p id="status" class="feedback" role="status">Loading tasks…</p>
+        <noscript>Enable JavaScript to load and manage your tasks.</noscript>
+        <div id="empty" class="empty" hidden>
+          <strong id="empty-title"></strong>
+          <p id="empty-detail"></p>
+          <button class="button secondary" id="clear-filters" type="button" hidden>Clear filters</button>
         </div>
-        <div class="search">
-          <label for="search">Search</label>
-          <input type="search" id="search" placeholder="Find by title">
-        </div>
-      </div>
-      <p id="status" role="status">Loading tasks…</p>
-      <p id="empty" hidden></p>
-      <ul aria-label="Task list"></ul>
-    </section>
+        <ul id="tasks" aria-label="Task list"></ul>
+      </section>
+
+      <aside class="overview" aria-labelledby="overview-heading">
+        <h2 id="overview-heading">Progress</h2>
+        <label class="progress-label" for="progress">Completion <output id="percent">—</output></label>
+        <progress id="progress" max="100" value="0"></progress>
+        <dl class="totals">
+          <div><dt>Open</dt><dd id="open-count">—</dd></div>
+          <div><dt>Completed</dt><dd id="done-count">—</dd></div>
+        </dl>
+      </aside>
+    </div>
   </main>
 
   <dialog id="task-dialog" aria-labelledby="dialog-title">
@@ -59,10 +70,10 @@
         <input id="edit-title" maxlength="120">
       </div>
       <p id="delete-text" hidden></p>
-      <p id="dialog-status" role="status"></p>
+      <p id="dialog-status" class="feedback error" role="status"></p>
       <div class="actions">
-        <button class="secondary" id="cancel" type="button">Cancel</button>
-        <button id="confirm" type="submit"></button>
+        <button class="button secondary" id="cancel" type="button">Cancel</button>
+        <button class="button primary" id="confirm" type="submit"></button>
       </div>
     </form>
   </dialog>

@@ -25,7 +25,7 @@ From the repository root:
 ```bash
 minikube start -p lab --driver=docker --cpus=4 --memory=8192 --kubernetes-version=v1.34.0
 minikube -p lab image build -t taskboard-api:v2 ./app/api
-minikube -p lab image build -t taskboard-web:v2 ./app/web
+minikube -p lab image build -t taskboard-web:v3 ./app/web
 ```
 
 The images are built directly into Minikube. Their tags match `deploy/app/kustomization.yaml`.
@@ -113,12 +113,12 @@ The Nginx and API request logs omit task titles, request bodies, and query strin
 
 ## Upgrade an existing lab
 
-Build both `v2` images in `lab` using the commands above before merging the changes into `main`. Argo CD then rolls out the app and provisioned dashboard. The existing PostgreSQL schema already supports title edits.
+Build the images listed above in `lab` before merging into `main`. If the API is already running `taskboard-api:v2`, build only `taskboard-web:v3`. Argo CD rolls out the frontend when it sees the new tag. Reload the page after the rollout to fetch the matching styles and script.
 
 ## Practice GitOps
 
-1. Change the frontend heading in `app/web/index.html` and build a new image with `minikube -p lab image build -t taskboard-web:v3 ./app/web`.
-2. Set the web image's `newTag` to `v3` in `deploy/app/kustomization.yaml`, then commit and push both changes. Watch Argo CD roll out the new image.
+1. Change the frontend heading in `app/web/index.html` and build a new image with `minikube -p lab image build -t taskboard-web:v4 ./app/web`.
+2. Set the web image's `newTag` to `v4` in `deploy/app/kustomization.yaml`, then commit and push both changes. Watch Argo CD roll out the new image.
 3. Practice self-healing by changing the web Deployment replica count directly in the cluster. Argo CD should restore the value from Git. Revert the image-tag commit to practice rolling back through Git.
 
 For API changes, follow the same build-and-tag workflow with `taskboard-api`. Keep the previous images in Minikube for rollbacks. PostgreSQL, Prometheus, Loki, and Grafana keep data on persistent volume claims. PostgreSQL runs `01-tasks.sql` on first initialization of an empty data directory. Apply future schema changes as migrations for existing databases.
