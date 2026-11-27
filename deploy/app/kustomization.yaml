@@ -10,9 +10,9 @@ configMapGenerator:
   - 01-tasks.sql
   name: postgres-init
 images:
-- digest: sha256:8b6c58ccec76a5d4158f396e54f2fe66b781717609b3204bd4c405956b24fd03
+- digest: sha256:0338af22737f026661f73011896ae2bcdcae0e91d503cf9ec83666e2bf7e741e
   name: taskboard-api
   newName: docker.io/rahulpht/taskboard-api
-- digest: sha256:fd181e5f1b063d321b6d8eb378af6b099a9d090764deb8d5602771daa9fea911
+- digest: sha256:298d86ab2156ddb5e4001cd4fbf6cf16699f1c8387b73be7dbe133651f2dbed2
   name: taskboard-web
   newName: docker.io/rahulpht/taskboard-web
