@@ -60,6 +60,26 @@
         </dl>
       </aside>
     </div>
+
+    <section class="board practice" aria-labelledby="practice-heading">
+      <h2 id="practice-heading">HTTP status practice</h2>
+      <p class="feedback" id="practice-help">Choose a status code, send a request, and watch the counts in Prometheus.</p>
+      <form id="status-practice" aria-describedby="practice-help">
+        <label for="practice-code">Response status</label>
+        <div class="entry">
+          <select id="practice-code" name="code">
+            <option value="200">200 OK</option>
+            <option value="400">400 Bad Request</option>
+            <option value="404">404 Not Found</option>
+            <option value="429">429 Too Many Requests</option>
+            <option value="500">500 Internal Server Error</option>
+            <option value="503">503 Service Unavailable</option>
+          </select>
+          <button class="button primary" type="submit">Send request</button>
+        </div>
+      </form>
+      <p id="practice-result" class="feedback" role="status"></p>
+    </section>
   </main>
 
   <dialog id="task-dialog" aria-labelledby="dialog-title">

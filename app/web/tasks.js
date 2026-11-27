@@ -226,4 +226,36 @@ clearFilters.addEventListener("click", () => {
   search.focus();
 });
 search.addEventListener("input", render);
+
+const practice = document.querySelector("#status-practice");
+const practiceButton = practice.querySelector("button");
+const practiceResult = document.querySelector("#practice-result");
+practice.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (practiceButton.disabled) return;
+
+  const code = new FormData(practice).get("code");
+  const query = new URLSearchParams({ code });
+  practiceButton.disabled = true;
+  practiceResult.classList.remove("error");
+  practiceResult.textContent = "Sending request…";
+  try {
+    const response = await fetch(`/api/practice/status?${query}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(17000),
+    });
+    const requestId = response.headers.get("X-Request-ID");
+    const result = await response.json().catch(() => null);
+    const simulated = result?.practice === true && result.status === response.status;
+    practiceResult.classList.toggle("error", !simulated);
+    const detail = simulated ? `${result.reason} (simulated)` : "unexpected response";
+    practiceResult.textContent = `HTTP ${response.status} ${detail}${requestId ? ` · Request ID: ${requestId}` : ""}`;
+  } catch {
+    practiceResult.classList.add("error");
+    practiceResult.textContent = "Could not reach the practice endpoint. Try again.";
+  } finally {
+    practiceButton.disabled = false;
+  }
+});
+
 load();
