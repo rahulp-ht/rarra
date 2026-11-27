@@ -99,6 +99,20 @@ The **Taskboard** dashboard includes **Pod CPU usage** and **Pod memory working 
 
 After the monitoring Application syncs, open Prometheus at http://localhost:4083/targets and check that `kubelet-resource` is **UP**. Allow several 15-second scrapes for the CPU rate. The metrics come from kubelet’s HTTPS resource endpoint. The lab accepts Minikube’s self-signed kubelet certificate and authenticates with a dedicated service account.
 
+## Practice HTTP response codes
+
+Open Taskboard at http://localhost:4080 and use **HTTP status practice** to send a 200, 400, 404, 429, 500, or 503 response. These are real HTTP status codes from a dedicated API endpoint. They leave task data and service health unaffected. Use the returned request ID to find the event in Loki.
+
+In Prometheus at http://localhost:4083 or Grafana Explore, use this query to see estimated request totals by status for the last minute:
+
+```promql
+sum by (status) (
+  increase(taskboard_http_requests_total{route="/api/practice/status"}[1m])
+)
+```
+
+Wait for the next 15-second scrape after sending requests. To exclude simulated traffic from your regular API queries, use the label matcher `route!="/api/practice/status"`.
+
 ## Follow a request in Grafana
 
 Create, rename, and complete a task, then open the **Taskboard** dashboard. Allow a few 15-second Prometheus scrapes for rate panels. Task actions count committed changes. PostgreSQL task totals reflect the latest successful inventory query. Search and filters run in the browser.

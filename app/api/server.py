@@ -4,6 +4,7 @@ import os
 import re
 import sys
 from contextlib import contextmanager
+from http import HTTPStatus
 from time import monotonic
 from uuid import uuid4
 
@@ -20,6 +21,11 @@ app.logger.setLevel(logging.INFO)
 app.config["MAX_CONTENT_LENGTH"] = 8192
 requests = Counter("taskboard_http_requests_total", "API responses", ["method", "route", "status"])
 latency = Histogram("taskboard_http_request_duration_seconds", "API response duration", ["method", "route"])
+PRACTICE_ROUTE = "/api/practice/status"
+PRACTICE_STATUSES = {str(code): HTTPStatus(code) for code in (200, 400, 404, 429, 500, 503)}
+for code in PRACTICE_STATUSES:
+    requests.labels("GET", PRACTICE_ROUTE, code)
+
 actions = Counter("taskboard_task_actions_total", "Committed task actions", ["action"])
 database_latency = Histogram(
     "taskboard_database_operation_duration_seconds",
@@ -131,6 +137,16 @@ def ready():
 @app.get("/metrics")
 def metrics():
     return Response(generate_latest(), content_type=CONTENT_TYPE_LATEST)
+
+
+@app.get(PRACTICE_ROUTE)
+def practice_status():
+    status = PRACTICE_STATUSES.get(request.args.get("code"))
+    if status is None:
+        return jsonify(error="Choose one of the supported practice status codes."), 400
+    response = jsonify(practice=True, status=status.value, reason=status.phrase)
+    response.headers["Cache-Control"] = "no-store"
+    return response, status.value
 
 
 @app.get("/api/tasks")
