@@ -1,0 +1,132 @@
+name: Taskboard CI and image delivery
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/taskboard.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+concurrency:
+  group: taskboard-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Check app and manifests
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check source and render manifests
+        run: |
+          node --check app/web/tasks.js
+          python3 -m py_compile app/api/server.py
+          kubectl kustomize deploy/app >/dev/null
+          kubectl kustomize deploy/monitoring >/dev/null
+      - name: Verify that both images build
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build -t taskboard-api:ci ./app/api
+          docker build -t taskboard-web:ci ./app/web
+
+  publish:
+    name: Publish Docker Hub images
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      api_image: ${{ steps.images.outputs.api_image }}
+      web_image: ${{ steps.images.outputs.web_image }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Sign in to Docker Hub
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          : "${DOCKERHUB_USERNAME:?Set the DOCKERHUB_USERNAME repository variable}"
+          : "${DOCKERHUB_TOKEN:?Set the DOCKERHUB_TOKEN repository secret}"
+          printf '%s' "$DOCKERHUB_TOKEN" | docker login --username "$DOCKERHUB_USERNAME" --password-stdin
+      - name: Build and publish immutable image references
+        id: images
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+        run: |
+          for component in api web; do
+            repository="docker.io/${DOCKERHUB_USERNAME}/taskboard-${component}"
+            metadata="$RUNNER_TEMP/taskboard-${component}.json"
+            docker buildx build --push --tag "$repository:$GITHUB_SHA" \
+              --metadata-file "$metadata" "./app/$component"
+            digest=$(jq -er '."containerimage.digest" | select(test("^sha256:[a-f0-9]{64}$"))' "$metadata")
+            printf '%s_image=%s@%s\n' "$component" "$repository" "$digest" >> "$GITHUB_OUTPUT"
+            printf -- '- `%s@%s`\n' "$repository" "$digest" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+  promote:
+    name: Open GitOps pull request
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install Kustomize
+        run: |
+          GOBIN="$RUNNER_TEMP/taskboard-ci-bin" go install sigs.k8s.io/kustomize/kustomize/v5@v5.7.1
+          printf '%s\n' "$RUNNER_TEMP/taskboard-ci-bin" >> "$GITHUB_PATH"
+      - name: Update image references and open the promotion PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          API_IMAGE: ${{ needs.publish.outputs.api_image }}
+          WEB_IMAGE: ${{ needs.publish.outputs.web_image }}
+        run: |
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
+          if ! git diff --quiet "$GITHUB_SHA" origin/main -- app/; then
+            echo "Main has newer app changes. Skipping promotion of this build."
+            exit 0
+          fi
+          git checkout --detach origin/main
+
+          (
+            cd deploy/app
+            kustomize edit set image "taskboard-api=$API_IMAGE" "taskboard-web=$WEB_IMAGE"
+            kustomize build . >/dev/null
+          )
+
+          git add deploy/app/kustomization.yaml
+          if git diff --cached --quiet; then
+            echo "These image references are already on main."
+            exit 0
+          fi
+
+          branch=automation/taskboard-images
+          expected=$(git ls-remote --heads origin "refs/heads/$branch" | cut -f 1)
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "Deploy Taskboard images from $GITHUB_SHA"
+          git push --force-with-lease="refs/heads/$branch:$expected" origin "HEAD:refs/heads/$branch"
+
+          pr_count=$(gh pr list --base main --head "$branch" --state open --json number --jq length)
+          if [[ $pr_count == 0 ]]; then
+            gh pr create --base main --head "$branch" --title "Deploy published Taskboard images" \
+              --body "Update the API and web image digests. Merge this PR to deploy them to lab through Argo CD. The manifest diff records the exact images."
+          fi
