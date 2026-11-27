@@ -121,6 +121,18 @@ The Nginx and API request logs omit task titles, request bodies, and query strin
 
 Build the images listed above in `lab` before merging into `main`. If the API is already running `taskboard-api:v2`, build only `taskboard-web:v3`. Argo CD rolls out the frontend when it sees the new tag. Reload the page after the rollout to fetch the matching styles and script.
 
+## Build and deploy through GitHub Actions
+
+The workflow in `.github/workflows/taskboard.yml` checks PRs into `main` and builds both images. On pushes to `main` that change app code or the workflow, it publishes `taskboard-api` and `taskboard-web` to Docker Hub, tags each with the commit SHA, and opens or updates a promotion PR with both image digests.
+
+1. Create two **public** Docker Hub repositories called `taskboard-api` and `taskboard-web` under your Docker Hub account. Public images let the lab pull both images without a registry secret. The existing local image references stay in effect until you merge the promotion PR.
+2. In your GitHub repository, add the Actions variable `DOCKERHUB_USERNAME` and the Actions secret `DOCKERHUB_TOKEN`. The Docker Hub token needs Read & Write access.
+3. Under **Settings → Actions → General → Workflow permissions**, enable **Allow GitHub Actions to create and approve pull requests**. The workflow creates or updates the PR. You review and merge it. The branch `automation/taskboard-images` is managed by the workflow.
+4. Merge the workflow into `main`. Later, merge app changes into `main` to publish new images. You can also use **Run workflow** from `main` to retry publishing.
+5. Review the promotion PR and merge it into `main`. If GitHub prompts you to **Approve workflows to run** for that PR, approve them before merging. Argo CD then deploys the Docker Hub images by digest. Check the `taskboard` Application for **Synced** and **Healthy**.
+
+Once the image references point to Docker Hub, Minikube pulls them during a rollout and the local image build commands are optional for development. To roll back, revert the promotion commit on `main` so Argo CD deploys the previous image references. Keep those images available.
+
 ## Practice GitOps
 
 1. Change the frontend heading in `app/web/index.html` and build a new image with `minikube -p lab image build -t taskboard-web:v4 ./app/web`.
