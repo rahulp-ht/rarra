@@ -2,15 +2,17 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: taskboard
 resources:
-  - postgres.yaml
-  - api.yaml
-  - web.yaml
+- postgres.yaml
+- api.yaml
+- web.yaml
 configMapGenerator:
-  - name: postgres-init
-    files:
-      - 01-tasks.sql
+- files:
+  - 01-tasks.sql
+  name: postgres-init
 images:
-  - name: taskboard-api
-    newTag: v2
-  - name: taskboard-web
-    newTag: v3
+- digest: sha256:8b6c58ccec76a5d4158f396e54f2fe66b781717609b3204bd4c405956b24fd03
+  name: taskboard-api
+  newName: docker.io/rahulpht/taskboard-api
+- digest: sha256:fd181e5f1b063d321b6d8eb378af6b099a9d090764deb8d5602771daa9fea911
+  name: taskboard-web
+  newName: docker.io/rahulpht/taskboard-web
